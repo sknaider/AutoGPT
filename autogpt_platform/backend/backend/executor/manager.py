@@ -976,6 +976,9 @@ class ExecutionProcessor:
                         and (running_node_execution or running_node_evaluation)
                     ):
                         cluster_lock.refresh()
+                        # Note: time.sleep() is acceptable here because this function
+                        # runs in a dedicated ThreadPoolExecutor thread, not in the
+                        # async event loop. Short sleep prevents busy-waiting.
                         time.sleep(0.1)
 
             # loop done --------------------------------------------------
@@ -1352,8 +1355,14 @@ class ExecutionManager(AppProcess):
         self.cancel_thread.start()
         self.run_thread.start()
 
-        while True:
-            time.sleep(1e5)
+        # Keep main thread alive with graceful shutdown support
+        # Use Event.wait() instead of time.sleep() for better responsiveness
+        try:
+            while not self.stop_consuming.is_set():
+                self.stop_consuming.wait(timeout=60)  # Check every minute
+        except KeyboardInterrupt:
+            logger.info(f"[{self.service_name}] Received shutdown signal, cleaning up...")
+            self.cleanup()
 
     @continuous_retry()
     def _consume_execution_cancel(self):
