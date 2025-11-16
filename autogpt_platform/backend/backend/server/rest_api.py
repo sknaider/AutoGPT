@@ -42,6 +42,8 @@ from backend.data.model import Credentials
 from backend.integrations.providers import ProviderName
 from backend.monitoring.instrumentation import instrument_fastapi
 from backend.server.external.api import external_app
+from backend.server.middleware.csrf import CSRFProtectionMiddleware
+from backend.server.middleware.https import HTTPSEnforcementMiddleware
 from backend.server.middleware.security import SecurityHeadersMiddleware
 from backend.util import json
 from backend.util.cloud_storage import shutdown_cloud_storage_handler
@@ -51,6 +53,7 @@ from backend.util.exceptions import (
     NotFoundError,
 )
 from backend.util.feature_flag import initialize_launchdarkly, shutdown_launchdarkly
+from backend.util.secrets_validator import validate_secrets_on_startup
 from backend.util.service import UnhealthyServiceError
 
 settings = backend.util.settings.Settings()
@@ -73,6 +76,9 @@ def launch_darkly_context():
 
 @contextlib.asynccontextmanager
 async def lifespan_context(app: fastapi.FastAPI):
+    # Validate secrets before anything else (enterprise security)
+    validate_secrets_on_startup(settings)
+
     verify_auth_settings()
 
     await backend.data.db.connect()
@@ -166,6 +172,12 @@ app = fastapi.FastAPI(
 )
 
 app.add_middleware(SecurityHeadersMiddleware)
+
+# Enterprise Security Middlewares
+# Note: Middleware execution order is LIFO (Last In, First Out)
+# These are added in reverse order of execution
+app.add_middleware(CSRFProtectionMiddleware, settings=settings)
+app.add_middleware(HTTPSEnforcementMiddleware, settings=settings)
 
 # Add GZip compression middleware for large responses (like /api/blocks)
 app.add_middleware(GZipMiddleware, minimum_size=50_000)  # 50KB threshold

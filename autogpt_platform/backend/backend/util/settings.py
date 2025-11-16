@@ -412,6 +412,32 @@ class Config(UpdateTrackingModel["Config"], BaseSettings):
         description="What environment to behave as: local or cloud",
     )
 
+    # Security Configuration - Enterprise Features
+    enable_csrf_protection: bool = Field(
+        default=True,
+        description="Enable CSRF protection middleware for all state-changing requests",
+    )
+
+    enforce_https: bool = Field(
+        default=True,
+        description="Enforce HTTPS in production by redirecting HTTP to HTTPS",
+    )
+
+    environment: str = Field(
+        default="local",
+        description="Environment name: local, development, staging, or production",
+    )
+
+    validate_secrets_on_startup: bool = Field(
+        default=True,
+        description="Validate that all required secrets are properly configured on startup",
+    )
+
+    require_strong_secrets: bool = Field(
+        default=True,
+        description="Require strong secrets (not default values) in production",
+    )
+
     execution_event_bus_name: str = Field(
         default="execution_event",
         description="Name of the event bus",
